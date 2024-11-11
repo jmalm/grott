@@ -313,10 +313,9 @@ class GrottHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                     # test if register is specified and set reg value. 
                     if command == "register":
                         #test if valid reg is applied
-                        if int(urlquery["register"][0]) >= 0 and int(urlquery["register"][0]) < 4096 : 
-                            register = urlquery["register"][0]
-                        else: 
-                            responsetxt = b'invalid reg value specified'
+                        register = int(urlquery["register"][0])
+                        if not self.is_register_valid(register):
+                            responsetxt = f'invalid reg value specified: {register}'.encode('utf-8')
                             responserc = 400 
                             responseheader = "text/body"
                             htmlsendresp(self,responserc,responseheader,responsetxt)
@@ -549,10 +548,9 @@ class GrottHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
                     if command == "register":
                         #test if valid reg is applied
-                        if int(urlquery["register"][0]) >= 0 and int(urlquery["register"][0]) < 4096 : 
-                            register = urlquery["register"][0]
-                        else: 
-                            responsetxt = b'invalid reg value specified'
+                        register = int(urlquery["register"][0])
+                        if not self.is_register_valid(register):
+                            responsetxt = f'invalid reg value specified: {register}'.encode('utf-8')
                             responserc = 400 
                             responseheader = "text/body"
                             htmlsendresp(self,responserc,responseheader,responsetxt)
@@ -789,6 +787,13 @@ class GrottHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
         except Exception as e:
             print("\t - Grottserver - exception in httpserver thread - put occured : ", e)    
+
+    def is_register_valid(self, register: int):
+        if 0 <= register < 4096:
+            return True
+        if register == 30100:  # VPP on MOD 10KTL3-XH
+            return True
+        return False
         
 
 class GrottHttpServer:
