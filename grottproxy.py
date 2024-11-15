@@ -16,6 +16,7 @@ if sys.platform != 'win32' :
    from signal import signal, SIGPIPE, SIG_DFL
 
 from grottdata import procdata, decrypt, format_multi_line
+from messages import get_message, AnnounceMessage
 
 #import mqtt                       
 import paho.mqtt.publish as publish
@@ -105,6 +106,7 @@ class Proxy:
         if sys.platform != 'win32':
             signal(SIGPIPE, SIG_DFL) 
         ## 
+        self.logger_registry = {}
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         #set default grottip address
@@ -269,9 +271,22 @@ class Proxy:
 
         # send data to destination
         self.channel[self.s].send(data)
+
+        self.handle_message(get_message(data))
+
         if len(data) > conf.minrecl :
             #process received data
             procdata(conf,data)    
         else:     
             if conf.verbose: print("\t - " + 'Data less then minimum record length, data not processed') 
-                
+
+    def handle_message(self, message):
+        if type(message) is AnnounceMessage:
+            client_address, client_port = self.s.getpeername()
+            self.logger_registry[message.logger_id] = {
+                "ip": client_address,
+                "port": client_port,
+                "protocol": message.protocol,
+                message.inverter_id: {"inverterno": message.inverter_no, "power": 0}
+            }
+            print(f"Announce message received. Logger registry: {self.logger_registry}")
