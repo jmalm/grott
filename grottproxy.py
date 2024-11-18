@@ -16,7 +16,8 @@ if sys.platform != 'win32' :
    from signal import signal, SIGPIPE, SIG_DFL
 
 from grottdata import procdata, decrypt, format_multi_line
-from messages import get_message, AnnounceMessage
+from messages.announce import AnnounceMessage
+from messages import get_logger_message
 
 #import mqtt                       
 import paho.mqtt.publish as publish
@@ -272,7 +273,7 @@ class Proxy:
         # send data to destination
         self.channel[self.s].send(data)
 
-        self.handle_message(get_message(data))
+        self.handle_message(get_logger_message(data))
 
         if len(data) > conf.minrecl :
             #process received data
