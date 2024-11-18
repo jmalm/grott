@@ -70,7 +70,12 @@ def decrypt(decdata) :
     result_string = "".join("{:02x}".format(n) for n in unscrambled)
     
     print("\t - " + "Growatt data decrypted V2")   
-    return result_string        
+    return result_string
+
+
+def encrypt(data):
+    return decrypt(data)  # Same message encrypts and decrypts?!?
+
 
 def str2bool(defstr):
     if defstr in ("True", "true", "TRUE", "y", "Y", "yes", "YES", 1, "1") : defret = True 
