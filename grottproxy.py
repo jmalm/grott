@@ -2,7 +2,7 @@
 #       
 # Updated: 2024-10-29
 # Version 2.8.3_241023
-
+import os.path
 import socket
 import select
 import time
@@ -291,3 +291,9 @@ class Proxy:
                 message.inverter_id: {"inverterno": message.inverter_no, "power": 0}
             }
             print(f"Announce message received. Logger registry: {self.logger_registry}")
+            return
+
+        # Print messages for reverse engineering.
+        # TODO: Do this in a better way. Maybe via some web api.
+        if os.path.exists("print_all_data"):
+            print(f"Message received {message.data}")
