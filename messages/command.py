@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import libscrc
+import libscrc_fake as libscrc
 
 from grottdata import encrypt
 from messages.response import Response
