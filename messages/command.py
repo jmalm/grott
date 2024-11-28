@@ -10,14 +10,14 @@ from messages.message import Message
 class Command(Message):
     response: Response
     body: str
-    device_id: str
+    device_id: int
     header: str
 
     @property
     def header(self):
         send_sequence = 1  # No idea what this means
         body_length = len(bytes.fromhex(self.body)) + 2  # Add two bytes for device id and record type.
-        return f"{send_sequence:04x}00{self.protocol}{body_length:04x}{self.device_id}{self.record_type}"
+        return f"{send_sequence:04x}00{self.protocol}{body_length:04x}{self.device_id:02x}{self.record_type}"
 
     @property
     def data(self):

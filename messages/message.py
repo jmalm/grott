@@ -6,8 +6,8 @@ class Message:
     is_encrypted_ack = False
     raw: bytes
     header: str
-    protocol: str
-    record_type: str
+    protocol: str  # TODO: Make this an enum, or at least an int
+    record_type: str  # TODO: Make this an enum, or at least an int
     protocol: str | None = None
 
     @property
