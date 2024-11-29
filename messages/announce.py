@@ -4,7 +4,7 @@ from .logger_message import LoggerMessage
 
 
 class AnnounceMessage(LoggerMessage):
-    record_type = "03"
+    record_type = 3
 
     def __init__(self, data):
         super().__init__(data)

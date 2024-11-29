@@ -7,7 +7,7 @@ from messages.response import Response
 
 
 class DataloggerGetCommand(Command):
-    record_type = "19"
+    record_type = 25  # 0x19
     device_id = "01"  # Always 1 for datalogger
 
     def __init__(self, datalogger_id: str, register: int, protocol: str, response_format: str = "dec"):
@@ -25,7 +25,7 @@ class DataloggerGetCommand(Command):
 
 
 class DataloggerGetResponse(Response):
-    record_type = "19"
+    record_type = DataloggerGetCommand.record_type
 
     def __init__(self, data):
         super().__init__(data)

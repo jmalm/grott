@@ -7,7 +7,7 @@ class Message:
     raw: bytes
     header: str
     protocol: str  # TODO: Make this an enum, or at least an int
-    record_type: str  # TODO: Make this an enum, or at least an int
+    record_type: int
     protocol: str | None = None
 
     @property

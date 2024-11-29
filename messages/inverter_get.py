@@ -2,7 +2,7 @@ from messages.response import Response
 
 
 class InverterGetResponse(Response):
-    record_type = "05"
+    record_type = 5
     is_encrypted_ack = True
 
     def __init__(self, data):

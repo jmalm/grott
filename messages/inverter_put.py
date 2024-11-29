@@ -8,7 +8,7 @@ from messages.response import Response
 
 
 class InverterPutMultipleCommand(Command):
-    record_type = f"{16:02x}"
+    record_type = 16  # 0x10
     buffer_length = 10  # number of words (2 bytes) between datalogger id and body
 
     def __init__(self, protocol: int, device_id: int, datalogger_id: bytes, start_register: int, end_register: int,
@@ -36,15 +36,15 @@ class InverterPutMultipleCommand(Command):
     def serialize(self):
         send_sequence = 1
         body_length = len(self.body) + 2  # Add two bytes for crc16
-        header = f"{send_sequence:04x}00{self.protocol}{body_length:04x}{self.device_id:02x}{self.record_type}"
+        header = f"{send_sequence:04x}00{self.protocol}{body_length:04x}{self.device_id:02x}{self.record_type:02x}"
         data = bytes.fromhex(header) + self.body  # TODO: Harmonize with Command and Message
-        encrypted = encrypt(data)
+        encrypted = encrypt(data, return_bytes=True)
         crc16 = libscrc.modbus(encrypted)
         return encrypted + crc16.to_bytes(2, "big")
 
 
 class InverterPutResponse(Response):
-    record_type = "06"
+    record_type = 6
     is_encrypted_ack = True
     offset = 40
 
@@ -56,7 +56,7 @@ class InverterPutResponse(Response):
 
 
 class InverterPutMultipleResponse(Response):
-    record_type = "10"
+    record_type = InverterPutMultipleCommand.record_type
 
     def __init__(self, data):
         super().__init__(data)
