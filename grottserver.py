@@ -278,8 +278,8 @@ class GrottHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                 if not self.connection_server.message_collector:
                     htmlsendresp(self, 401, "text/html", "Message collection not started. Send PUT to /collect_messages?max=N to collect up to N messages.")
                     return
-                data = self.connection_server.message_collector.to_json().encode('ISO-8859-1')
-                htmlsendresp(self, 200, "text/html", data)
+                data = self.connection_server.message_collector.to_json().encode('utf-8')
+                htmlsendresp(self, 200, "application/json", data)
                 return
 
             elif self.path.startswith("datalogger") or self.path.startswith("inverter") :
@@ -1065,7 +1065,7 @@ class sendrecvserver:
         logger.debug("handle_message_from_server, data from growatt server will be ignored")
         logger.debug("handle_message_from_server, original data:\n{0} \n".format(format_multi_line("\t", data, 80)))
         if self.message_collector:
-            self.message_collector.add(data, address, port)
+            self.message_collector.add(data, address, port, from_datalogger="192.168" in address)
 
     def handle_writable_socket(self, conf, s, trname):
         #logger.debug("handle_writable_socket for: %s",s)
