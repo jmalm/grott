@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import select
 import socket
 import queue
@@ -10,11 +12,13 @@ import json, codecs
 from itertools import cycle
 #from io import BytesIO
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs, parse_qsl
+from urllib.parse import urlparse, parse_qs
 from collections import defaultdict
 import logging
 import os,psutil
 from grottdata import procdata
+from message_collector import MessageCollector
+from util import calc_crc
 
 #set logging definities
 #logging.basicConfig(level=logging.INFO)
@@ -117,18 +121,6 @@ def decrypt(decdata):
     print("\t - " + "Grott - data decrypted V2")
     return result_string
 
-def calc_crc(data):
-    #calculate CR16, Modbus.
-    crc = 0xFFFF
-    for pos in data:
-        crc ^= pos
-        for i in range(8):
-            if ((crc & 1) != 0):
-                crc >>= 1
-                crc ^= 0xA001
-            else:
-                crc >>= 1
-    return crc
 
 def validate_record(xdata):
     # validata data record on length and CRC (for "05" and "06" records)
@@ -214,8 +206,9 @@ def createtimecommand(self, protocol,deviceid,loggerid,sequenceno) :
         return(body)
 
 class GrottHttpRequestHandler(http.server.BaseHTTPRequestHandler):
-    def __init__(self, send_queuereg, *args):
+    def __init__(self, send_queuereg, connection_server: sendrecvserver, *args):
         self.send_queuereg = send_queuereg
+        self.connection_server = connection_server
         super().__init__(*args)
 
     def do_GET(self):
@@ -279,6 +272,15 @@ class GrottHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                     responseheader = "text/html"
                     htmlsendresp(self,responserc,responseheader,responsetxt)
                     return
+
+            elif self.path.startswith("collect_messages"):
+                if verbose: print("\t - " + "Grotthttpserver - collect_messages get received : ", urlquery)
+                if not self.connection_server.message_collector:
+                    htmlsendresp(self, 401, "text/html", "Message collection not started. Send PUT to /collect_messages?max=N to collect up to N messages.")
+                    return
+                data = self.connection_server.message_collector.to_json().encode('ISO-8859-1')
+                htmlsendresp(self, 200, "text/html", data)
+                return
 
             elif self.path.startswith("datalogger") or self.path.startswith("inverter") :
                 if self.path.startswith("datalogger"):
@@ -528,6 +530,13 @@ class GrottHttpRequestHandler(http.server.BaseHTTPRequestHandler):
             #only allow files from current directory
             if self.path[0] == '/':
                 self.path =self.path[1:len(self.path)]
+
+            if self.path.startswith("collect_messages"):
+                if verbose: print("\t - Grotthttpserver - collect_messages PUT received : ", urlquery)
+                max_messages = int(urlquery["max"][0]) or 10
+                self.connection_server.start_collecting_messages(max_messages)
+                htmlsendresp(self, 200, "html/text", f"Collecting up to {max_messages} messages".encode('ISO-8859-1'))
+                return
 
             if self.path.startswith("datalogger") or self.path.startswith("inverter") :
                 if self.path.startswith("datalogger"):
@@ -857,14 +866,19 @@ class GrottHttpRequestHandler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             print("\t - Grottserver - exception in httpserver thread - put occured : ", e)
 
+    def do_DELETE(self):
+        if self.path == "/collect_messages":
+            self.connection_server.stop_collecting_messages()
+
 
 class GrottHttpServer:
     """This wrapper will create an HTTP server where the handler has access to the send_queue"""
 
-    def __init__(self, httphost, httpport, send_queuereg):
+    def __init__(self, httphost, httpport, send_queuereg, connection_server: sendrecvserver):
         def handler_factory(*args):
             """Using a function to create and return the handler, so we can provide our own argument (send_queue)"""
-            return GrottHttpRequestHandler(send_queuereg, *args)
+            logger.info("GrottHttpserver - creating request handler")
+            return GrottHttpRequestHandler(send_queuereg, connection_server, *args)
 
         self.server = http.server.HTTPServer((httphost, httpport), handler_factory)
         self.server.allow_reuse_address = True
@@ -882,6 +896,7 @@ class GrottHttpServer:
 
 class sendrecvserver:
     def __init__(self, conf, host, port, send_queuereg):
+        self.message_collector: MessageCollector | None = None
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.setblocking(0)
@@ -988,10 +1003,8 @@ class sendrecvserver:
                             try:
                                 if conf.serverpassthrough:
                                     sRaddr = s.getpeername()
-                                    if sRaddr[0] == conf.growattip and sRaddr[1] == int(conf.growattport) :
-                                        logger.debug("handle_readble_socket, data from growatt server will be ignored")
-                                        logger.debug("handle_readble_socket, original data:\n{0} \n".format(format_multi_line("\t",data,80)))
-                                        #no further processing needed
+                                    if sRaddr[0] == conf.growattip and sRaddr[1] == int(conf.growattport):
+                                        self.handle_message_from_server(data, sRaddr[0], sRaddr[1])
                                         return()
                                     else:
                                         logger.debug("handle_readble_socket, process data to sent to growatt server")
@@ -1046,6 +1059,11 @@ class sendrecvserver:
         except Exception as e:
             logger.warning("handle_readble_socket, generic exception: %s",e)
 
+    def handle_message_from_server(self, data: bytes, address: str, port: int):
+        logger.debug("handle_message_from_server, data from growatt server will be ignored")
+        logger.debug("handle_message_from_server, original data:\n{0} \n".format(format_multi_line("\t", data, 80)))
+        if self.message_collector:
+            self.message_collector.add(data, address, port)
 
     def handle_writable_socket(self, conf, s, trname):
         #logger.debug("handle_writable_socket for: %s",s)
@@ -1482,6 +1500,12 @@ class sendrecvserver:
         except Exception as e:
             print("\t - Grottserver - exception in main server thread occured : ", e)
 
+    def start_collecting_messages(self, max_messages: int = 10):
+        self.message_collector = MessageCollector(max_messages)
+
+    def stop_collecting_messages(self):
+        self.message_collector = None
+
 
 class Server :
 
@@ -1502,9 +1526,9 @@ class Server :
         # response from command is written is this variable (for now flat, maybe dict later)
         #commandresponse =  defaultdict(dict)
 
-        http_server = GrottHttpServer(conf.serverip, conf.httpport, send_queuereg)
         #connection_server = sendrecvserver(conf.serverip, conf.serverport, send_queuereg)
         connection_server = sendrecvserver(conf,"0.0.0.0", conf.serverport, send_queuereg)
+        http_server = GrottHttpServer(conf.serverip, conf.httpport, send_queuereg, connection_server)
         httpname = "httpserver_" + conf.serverip + ":" + str(conf.httpport)
         servername = "conserver_" + conf.serverip + ":" + str(conf.serverport)
         connection_server_thread = threading.Thread(target=connection_server.run,name=servername,args=[conf])

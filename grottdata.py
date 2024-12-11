@@ -54,7 +54,7 @@ def format_multi_line(prefix, string, size=80):
     return '\n'.join([prefix + line for line in textwrap.wrap(string, size)])
 
 
-def decrypt(decdata) :
+def decrypt(decdata, return_bytes=False) :
     """#decrypt data."""
     ndecdata = len(decdata)
 
@@ -69,10 +69,18 @@ def decrypt(decdata) :
     for i,j in zip(range(0,ndecdata-8),cycle(range(0,nmask))):
         unscrambled = unscrambled + [decdata[i+8] ^ int(hex_mask[j],16)]
 
+    if return_bytes:
+        return bytes(unscrambled)
+
     result_string = "".join("{:02x}".format(n) for n in unscrambled)
 
     logger.debug("Growatt data decrypted V2")
     return result_string
+
+
+def encrypt(data, return_bytes=False):
+    return decrypt(data, return_bytes)
+
 
 def str2bool(defstr):
     """Convert string input to bool """
