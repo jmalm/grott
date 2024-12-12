@@ -24,7 +24,6 @@ COPY grottsniffer.py /app/grottsniffer.py
 COPY message_collector.py /app/message_collector.py
 COPY messages.py /app/messages.py
 COPY util.py /app/util.py
-COPY grott.ini /app/grott.ini
 
 WORKDIR /app
 CMD ["python", "-u", "grott.py", "-v"]
